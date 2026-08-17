@@ -1,0 +1,10 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.idea/
+.DS_Store
+*.pyc
+__pycache__/
+build/
+firmware/build/
