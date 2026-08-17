@@ -19,7 +19,7 @@ void apply_defaults() {
     cfg.scan_interval_ms = 100;   // window==interval => continuous scan
     cfg.ft_mask          = FT_DEFAULT;
     strlcpy(cfg.ap_ssid, "ouispy-blesniff", sizeof(cfg.ap_ssid));
-    strlcpy(cfg.ap_pass, "sniffthem",       sizeof(cfg.ap_pass));
+    strlcpy(cfg.ap_pass, "sniffuntothem",       sizeof(cfg.ap_pass));
 }
 
 void clamp() {
@@ -33,7 +33,7 @@ void clamp() {
     if (cfg.ft_mask == 0)                      cfg.ft_mask = FT_DEFAULT;
     if (strlen(cfg.ap_ssid) == 0)              strlcpy(cfg.ap_ssid, "ouispy-blesniff", sizeof(cfg.ap_ssid));
     size_t pl = strlen(cfg.ap_pass);
-    if (pl < 8 || pl > 63)                     strlcpy(cfg.ap_pass, "sniffthem", sizeof(cfg.ap_pass));
+    if (pl < 8 || pl > 63)                     strlcpy(cfg.ap_pass, "sniffuntothem", sizeof(cfg.ap_pass));
 }
 
 } // namespace

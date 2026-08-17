@@ -16,7 +16,7 @@ Sister firmware to [ouispy-pcap](https://github.com/colonelpanichacks/ouispy-pca
 - **Two output modes on one USB-CDC**, runtime-toggle:
   - **PCAP binary** (default) — Wireshark-ready stream using `LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR` (256) so channel + RSSI survive
   - **Text summary** — human-readable one-liner per advert
-- **On-device dashboard** on `ouispy-blesniff` / `sniffthem` at `192.168.4.1` — live advert table, filter chips, session PCAP download
+- **On-device dashboard** on `ouispy-blesniff` / `sniffuntothem` at `192.168.4.1` — live advert table, filter chips, session PCAP download
 - **Chip filters**: advertising type (ADV_IND / ADV_NONCONN / ADV_SCAN / SCAN_REQ / SCAN_RSP / CONNECT_REQ / EXTENDED), traits (name-present / mfr-data / service-data), vendor identify against the OUI Database (RING, AXON, FLOCK SAFETY, DJI, PARROT, SKYDIO, META/RAY-BAN)
 - **Server-side 2 MB PSRAM session buffer** with browser download via `GET /api/session.pcap`
 - Configurable scan window / interval from the dashboard, filters persist to NVS
