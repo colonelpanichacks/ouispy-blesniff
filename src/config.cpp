@@ -15,8 +15,10 @@ Config      cfg;
 
 void apply_defaults() {
     cfg.out_mode         = OUT_PCAP;
-    cfg.scan_window_ms   = 100;
-    cfg.scan_interval_ms = 100;   // window==interval => continuous scan
+    // Leave ~70% of the 2.4 GHz radio for WiFi coexistence so the AP stays
+    // reachable while we scan. window==interval starves SoftAP beacons.
+    cfg.scan_window_ms   = 30;
+    cfg.scan_interval_ms = 100;
     cfg.ft_mask          = FT_DEFAULT;
     strlcpy(cfg.ap_ssid, "ouispy-blesniff", sizeof(cfg.ap_ssid));
     strlcpy(cfg.ap_pass, "sniffuntothem",       sizeof(cfg.ap_pass));
