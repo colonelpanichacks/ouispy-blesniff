@@ -814,7 +814,7 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
     if (tr & TR_CONNECTABLE)  keys.add('connectable');
     keys.forEach(bumpChip);
 
-    const vend = vendorFor(addr, msg.u, msg.s, msg.n);
+    const vend = vendorFor(addr, mfrHex, svc, name);
     if (vend) {
       hits++;
       vendorHitCounts[vend.id]++;
