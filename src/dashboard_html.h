@@ -416,13 +416,13 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
 
   <div class="topbar">
     <div class="banner-wrap">
-      <pre class="banner">  .oooooo.   ooooo     ooo ooooo          .oooooo..o ooooooooo.   oooooo   oooo       oooooooooo.   ooooo         oooooooooooo  .oooooo..o ooooo      ooo ooooo oooooooooooo oooooooooooo
- d8P'  `Y8b  `888'     `8' `888'         d8P'    `Y8 `888   `Y88.  `888.   .8'         `888'   `Y8b  `888'         `888'     `8 d8P'    `Y8 `88.       .8' `888' `888'     `8 `888'     `8
-888      888  888       8   888          Y88bo.       888   .d88'   `888. .8'           888     888   888           888         Y88bo.       888b     d'888   888   888          888
-888      888  888       8   888           `"Y8888o.   888ooo88P'     `888.8'            888     888   888           888oooo8     `"Y8888o.   8 Y88. .P  888   888   888oooo8     888oooo8
-888      888  888       8   888  8888888      `"Y88b  888             `888'             888     888   888           888    "         `"Y88b  8  `888'   888   888   888    "     888    "
-`88b    d88'  `88.    .8'   888          oo     .d8P  888              888              888    .88P   888       o   888       o oo     .d8P  8    Y     888   888   888          888
- `Y8bood8P'     `YbodP'    o888o         8""88888P'  o888o            o888o            o888bood8P'   o888ooooood8  o888ooooood8 8""88888P'  o8o        o888o o888o o888o        o888o</pre>
+      <pre class="banner">  .oooooo.   ooooo     ooo ooooo          .oooooo..o ooooooooo.   oooooo   oooo       oooooooooo.  ooooo        oooooooooooo  .oooooo..o ooooo      ooo ooooo oooooooooooo oooooooooooo
+ d8P'  `Y8b  `888'     `8' `888'         d8P'    `Y8 `888   `Y88.  `888.   .8'        `888'   `Y8b `888'        `888'     `8 d8P'    `Y8 `888b.     `8' `888' `888'     `8 `888'     `8
+888      888  888       8   888          Y88bo.       888   .d88'   `888. .8'          888     888  888          888         Y88bo.       8 `88b.    8   888   888          888
+888      888  888       8   888           `"Y8888o.   888ooo88P'     `888.8'           888oooo888'  888          888oooo8     `"Y8888o.   8   `88b.  8   888   888oooo8     888oooo8
+888      888  888       8   888  8888888      `"Y88b  888             `888'            888    `88b  888          888    "         `"Y88b  8     `88b.8   888   888    "     888    "
+`88b    d88'  `88.    .8'   888          oo     .d8P  888              888             888    .88P  888       o  888       o oo     .d8P  8       `888   888   888          888
+ `Y8bood8P'     `YbodP'    o888o         8""88888P'  o888o            o888o           o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o        o888o</pre>
       <span class="banner-compact">OUI-SPY // BLESNIFF</span>
     </div>
     <div class="status">
