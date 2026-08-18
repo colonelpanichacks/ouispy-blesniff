@@ -92,6 +92,8 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
     min-width: 0;
   }
   .banner-wrap { overflow: hidden; min-width: 0; }
+  .banner-stack { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+  .banner-stack .banner { flex: 0 0 auto; }
   .banner {
     font-family: ui-monospace, Menlo, Consolas, monospace;
     color: var(--accent);
@@ -377,7 +379,8 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
       grid-template-columns: 1fr;
       grid-template-areas: "topbar" "main" "footer";
     }
-    .banner { font-size: 4.5px; display: block; overflow: hidden; }
+    .banner-stack { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .banner { font-size: 6px; display: block; overflow: hidden; }
     .banner-compact { display: none; }
     .status { grid-template-columns: repeat(3, auto); font-size: 10px; gap: 2px 10px; }
     .topbar { padding: 8px 10px; }
@@ -408,7 +411,7 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
     .qf { padding: 4px 8px; max-height: 130px; }
     .qf-row .lbl { font-size: 10px; padding-left: 2px; }
     tbody td.info { max-width: 140px; }
-    .banner { font-size: 3.6px; }
+    .banner { font-size: 4.5px; }
   }
 </style>
 
@@ -416,13 +419,22 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
 
   <div class="topbar">
     <div class="banner-wrap">
-      <pre class="banner">  .oooooo.   ooooo     ooo ooooo          .oooooo..o ooooooooo.   oooooo   oooo       oooooooooo.  ooooo        oooooooooooo  .oooooo..o ooooo      ooo ooooo oooooooooooo oooooooooooo
- d8P'  `Y8b  `888'     `8' `888'         d8P'    `Y8 `888   `Y88.  `888.   .8'        `888'   `Y8b `888'        `888'     `8 d8P'    `Y8 `888b.     `8' `888' `888'     `8 `888'     `8
-888      888  888       8   888          Y88bo.       888   .d88'   `888. .8'          888     888  888          888         Y88bo.       8 `88b.    8   888   888          888
-888      888  888       8   888           `"Y8888o.   888ooo88P'     `888.8'           888oooo888'  888          888oooo8     `"Y8888o.   8   `88b.  8   888   888oooo8     888oooo8
-888      888  888       8   888  8888888      `"Y88b  888             `888'            888    `88b  888          888    "         `"Y88b  8     `88b.8   888   888    "     888    "
-`88b    d88'  `88.    .8'   888          oo     .d8P  888              888             888    .88P  888       o  888       o oo     .d8P  8       `888   888   888          888
- `Y8bood8P'     `YbodP'    o888o         8""88888P'  o888o            o888o           o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o        o888o</pre>
+      <div class="banner-stack">
+        <pre class="banner banner-1">  .oooooo.   ooooo     ooo ooooo          .oooooo..o ooooooooo.   oooooo   oooo
+ d8P'  `Y8b  `888'     `8' `888'         d8P'    `Y8 `888   `Y88.  `888.   .8'
+888      888  888       8   888          Y88bo.       888   .d88'   `888. .8'
+888      888  888       8   888           `"Y8888o.   888ooo88P'     `888.8'
+888      888  888       8   888  8888888      `"Y88b  888             `888'
+`88b    d88'  `88.    .8'   888          oo     .d8P  888              888
+ `Y8bood8P'     `YbodP'    o888o         8""88888P'  o888o            o888o</pre>
+        <pre class="banner banner-2">oooooooooo.  ooooo        oooooooooooo  .oooooo..o ooooo      ooo ooooo oooooooooooo oooooooooooo
+`888'   `Y8b `888'        `888'     `8 d8P'    `Y8 `888b.     `8' `888' `888'     `8 `888'     `8
+ 888     888  888          888         Y88bo.       8 `88b.    8   888   888          888
+ 888oooo888'  888          888oooo8     `"Y8888o.   8   `88b.  8   888   888oooo8     888oooo8
+ 888    `88b  888          888    "         `"Y88b  8     `88b.8   888   888    "     888    "
+ 888    .88P  888       o  888       o oo     .d8P  8       `888   888   888          888
+o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o        o888o</pre>
+      </div>
       <span class="banner-compact">OUI-SPY // BLESNIFF</span>
     </div>
     <div class="status">
