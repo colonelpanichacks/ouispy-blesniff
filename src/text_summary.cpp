@@ -101,20 +101,30 @@ uint16_t manufacturer_id(const scan::Frame& f) {
 
 const char* mfr_shortname(uint16_t id) {
     switch (id) {
+        // Big consumer
         case 0x004C: return "Apple";
         case 0x0006: return "Microsoft";
         case 0x00E0: return "Google";
         case 0x0075: return "Samsung";
-        case 0x0499: return "Ruuvi";
-        case 0x0059: return "Nordic";
-        case 0x0157: return "Anhui Huami";
-        case 0x0087: return "Garmin";
         case 0x0171: return "Amazon";
+        case 0x038F: return "Xiaomi";
+        case 0x0087: return "Garmin";
         case 0x00D2: return "Sonos";
         case 0x008A: return "Bose";
         case 0x2C00: return "GoPro";
+        // Silicon / dev
+        case 0x0059: return "Nordic";
         case 0x0131: return "Cypress";
-        case 0x038F: return "Xiaomi";
+        case 0x02E5: return "Espressif";
+        case 0x000F: return "Broadcom";
+        case 0x0002: return "Nokia";
+        case 0x0157: return "Anhui Huami";
+        case 0x0499: return "Ruuvi";
+        // Surveillance / drones / smartglasses (from Detector OUI Database)
+        case 0x034D: return "Axon/TASER";
+        case 0x0D53: return "Luxottica (Meta/Ray-Ban)";
+        case 0x0BF3: return "DJI";
+        case 0x004D: return "Parrot";
         default:     return "?";
     }
 }

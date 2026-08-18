@@ -653,14 +653,34 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
   // --- Vendor DB -------------------------------------------------------
   // Same OUI list as ouispy-pcap. Matched against the first 3 bytes of the
   // advertising address (the high three bytes when printed MSB-first).
+  // Match on any of: MAC OUI, Bluetooth SIG company ID (in mfr data),
+  // 16-bit service UUID, or a case-insensitive substring of the local name.
+  // BLE MACs randomize often -- CID / UUID / name are the reliable signals.
   const VENDORS = [
-    { id:'ring',   name:'RING',   color:'var(--v-ring)',   ouis:['00:0d:c5','14:cc:20','a4:77:33','b0:09:da','7c:8c:6c'] },
-    { id:'axon',   name:'AXON',   color:'var(--v-axon)',   ouis:['00:25:df'] },
-    { id:'flock',  name:'FLOCK',  color:'var(--v-flock)',  ouis:['a4:cf:12','24:6f:28','3c:71:bf','48:e7:29','98:cd:ac'] },
-    { id:'dji',    name:'DJI',    color:'var(--v-dji)',    ouis:['60:60:1f','48:1c:b9','a0:14:3d','34:d2:62'] },
-    { id:'parrot', name:'PARROT', color:'var(--v-parrot)', ouis:['00:26:7e','a0:14:3d','90:03:b7'] },
-    { id:'skydio', name:'SKYDIO', color:'var(--v-skydio)', ouis:['24:69:8e'] },
-    { id:'meta',   name:'META',   color:'var(--v-meta)',   ouis:['a4:c1:38','58:d5:6e','2c:41:a1','44:d9:e7','9c:d9:17'] },
+    { id:'ring',   name:'RING',   color:'var(--v-ring)',
+      ouis:['00:0d:c5','14:cc:20','a4:77:33','b0:09:da','7c:8c:6c'],
+      cids:['0171'],  // Amazon (Ring is Amazon-owned)
+      svcs:[], names:['Ring'] },
+    { id:'axon',   name:'AXON',   color:'var(--v-axon)',
+      ouis:['00:25:df'],
+      cids:['034d'],  // TASER International
+      svcs:['fc81'], names:[] },
+    { id:'flock',  name:'FLOCK',  color:'var(--v-flock)',
+      ouis:['a4:cf:12','24:6f:28','3c:71:bf','48:e7:29','98:cd:ac'],
+      cids:[], svcs:[], names:['Flock','Falcon','Raven'] },
+    { id:'dji',    name:'DJI',    color:'var(--v-dji)',
+      ouis:['0c:9a:e6','8c:58:23','04:a8:5a','58:b8:58','e4:7a:2c','60:60:1f','48:1c:b9','34:d2:62'],
+      cids:['0bf3'], svcs:[], names:['DJI','Mavic','Phantom','Inspire'] },
+    { id:'parrot', name:'PARROT', color:'var(--v-parrot)',
+      ouis:['00:12:1c','00:26:7e','90:03:b7','90:3a:e6','a0:14:3d'],
+      cids:['004d'], svcs:[], names:['Parrot','Anafi','Bebop'] },
+    { id:'skydio', name:'SKYDIO', color:'var(--v-skydio)',
+      ouis:['38:1d:14','24:69:8e'],
+      cids:[], svcs:[], names:['Skydio'] },
+    { id:'meta',   name:'META',   color:'var(--v-meta)',
+      ouis:['7c:2a:9e','cc:66:0a','f4:03:43','5c:e9:1e','98:59:49','80:aa:1c','38:47:12','a4:c1:38','58:d5:6e','2c:41:a1','44:d9:e7','9c:d9:17'],
+      cids:['0d53'],  // Luxottica (frame-side)
+      svcs:['fd5f'], names:['Ray-Ban','Wayfarer','Oakley Meta'] },
   ];
   const vendorEnabled = new Set(VENDORS.map(v => v.id));
   const vendorHitCounts = {};
@@ -683,12 +703,21 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
       applyFilter();
     });
   });
-  function vendorFor(mac) {
-    if (!mac) return null;
-    const prefix = mac.slice(0, 8).toLowerCase();
+  // Match on MAC OUI, Bluetooth SIG company ID, 16-bit service UUID (any of
+  // the comma-separated list in `svc`), or a case-insensitive name substring.
+  // Any signal wins -- BLE MACs are almost always randomized so CID/UUID/name
+  // are what actually catches Meta glasses, Axon body cams, DJI drones, etc.
+  function vendorFor(mac, cid, svcStr, name) {
+    const prefix   = mac ? mac.slice(0, 8).toLowerCase() : '';
+    const cidLower = cid ? cid.toLowerCase() : '';
+    const svcs     = svcStr ? svcStr.toLowerCase().split(',').map(s => s.replace(/^0x/, '').trim()) : [];
+    const nameL    = name ? name.toLowerCase() : '';
     for (const v of VENDORS) {
       if (!vendorEnabled.has(v.id)) continue;
-      if (v.ouis.includes(prefix)) return v;
+      if (prefix && v.ouis.includes(prefix)) return v;
+      if (cidLower && v.cids && v.cids.includes(cidLower)) return v;
+      if (svcs.length && v.svcs && v.svcs.some(u => svcs.includes(u))) return v;
+      if (nameL && v.names && v.names.some(n => nameL.includes(n.toLowerCase()))) return v;
     }
     return null;
   }
@@ -785,7 +814,7 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
     if (tr & TR_CONNECTABLE)  keys.add('connectable');
     keys.forEach(bumpChip);
 
-    const vend = vendorFor(addr);
+    const vend = vendorFor(addr, msg.u, msg.s, msg.n);
     if (vend) {
       hits++;
       vendorHitCounts[vend.id]++;
