@@ -29,6 +29,13 @@ size_t               g_used    = 0;
 uint32_t             g_dropped = 0;
 SemaphoreHandle_t    g_lock    = nullptr;
 
+// Immutable snapshot for /api/session.pcap downloads. Live ring can shift
+// under us via memmove; snapshot preserves a coherent view for the whole
+// response. Overwritten on each snapshot_take() call.
+uint8_t*             g_snap      = nullptr;
+size_t               g_snap_cap  = 0;
+size_t               g_snap_size = 0;
+
 void write_global_header_locked() {
     PcapGlobal g{};
     g.magic    = nordic_pcap::PCAP_MAGIC;
@@ -140,6 +147,37 @@ size_t read_chunk(size_t offset, uint8_t* out, size_t len) {
     }
     xSemaphoreGive(g_lock);
     return copied;
+}
+
+size_t snapshot_take() {
+    if (!g_buf || !g_lock) return 0;
+    xSemaphoreTake(g_lock, portMAX_DELAY);
+    const size_t sz = g_used;
+    if (sz == 0) { xSemaphoreGive(g_lock); g_snap_size = 0; return 0; }
+    // Reuse existing snap allocation if it fits; otherwise realloc in PSRAM.
+    if (!g_snap || g_snap_cap < sz) {
+        if (g_snap) heap_caps_free(g_snap);
+        g_snap = (uint8_t*) heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!g_snap) {
+            g_snap = (uint8_t*) malloc(sz);  // DRAM fallback for tiny buffers
+        }
+        if (!g_snap) { g_snap_cap = 0; g_snap_size = 0; xSemaphoreGive(g_lock); return 0; }
+        g_snap_cap = sz;
+    }
+    memcpy(g_snap, g_buf, sz);
+    g_snap_size = sz;
+    xSemaphoreGive(g_lock);
+    return sz;
+}
+
+size_t snapshot_size() { return g_snap_size; }
+
+size_t snapshot_read(size_t offset, uint8_t* out, size_t len) {
+    if (!g_snap || offset >= g_snap_size) return 0;
+    const size_t remain = g_snap_size - offset;
+    const size_t n = (len < remain) ? len : remain;
+    memcpy(out, g_snap + offset, n);
+    return n;
 }
 
 } // namespace session_pcap

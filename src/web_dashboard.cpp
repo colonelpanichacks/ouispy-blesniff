@@ -228,13 +228,15 @@ void handle_session_clear(AsyncWebServerRequest* req) {
 }
 
 void handle_session_pcap(AsyncWebServerRequest* req) {
-    const size_t total = session_pcap::size();
+    // Snapshot the live ring so the download can't desync when the writer
+    // memmoves the buffer mid-transfer.
+    const size_t total = session_pcap::snapshot_take();
     if (total == 0) { req->send(204, "application/vnd.tcpdump.pcap", ""); return; }
 
     AsyncWebServerResponse* r = req->beginChunkedResponse(
         "application/vnd.tcpdump.pcap",
         [](uint8_t* buf, size_t maxLen, size_t index) -> size_t {
-            return session_pcap::read_chunk(index, buf, maxLen);
+            return session_pcap::snapshot_read(index, buf, maxLen);
         });
     char filename[64];
     snprintf(filename, sizeof(filename), "attachment; filename=\"ouispy-blesniff-%lu.pcap\"",
