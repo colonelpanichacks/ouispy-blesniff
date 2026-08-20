@@ -122,6 +122,8 @@ void print_banner() {
     Serial.print(F(__DATE__ " " __TIME__));
     Serial.println();
     Serial.println(F("Passive receive only. Nothing is transmitted."));
+    Serial.println(F("Session PCAP boots IDLE. POST /api/session/record (or click"));
+    Serial.println(F("RECORD in the dashboard) to start capturing to the ring."));
     Serial.println();
 }
 
@@ -143,7 +145,8 @@ void handle_serial_cmd(const String& raw) {
         Serial.printf("{\"scan_win\":%u,\"scan_int\":%u,\"ftmask\":\"0x%02x\","
             "\"total\":%u,\"pps\":%u,\"drop_pcap\":%u,\"drop_dash\":%u,\"fw\":\"%s\","
             "\"ap_ssid\":\"%s\",\"ap_ip\":\"%s\",\"ap_mac\":\"%s\",\"ap_stations\":%u,"
-            "\"session_bytes\":%u}\n",
+            "\"session_bytes\":%u,\"session_cap\":%u,\"session_drop\":%u,"
+            "\"state\":\"%s\",\"psram_free\":%u,\"heap_free\":%u}\n",
             (unsigned)config::get().scan_window_ms,
             (unsigned)config::get().scan_interval_ms,
             (unsigned)config::get().ft_mask,
@@ -154,7 +157,12 @@ void handle_serial_cmd(const String& raw) {
             config::FW_VERSION(),
             config::get().ap_ssid, ip.toString().c_str(), apmac.c_str(),
             (unsigned)WiFi.softAPgetStationNum(),
-            (unsigned)session_pcap::size());
+            (unsigned)session_pcap::size(),
+            (unsigned)session_pcap::capacity(),
+            (unsigned)session_pcap::dropped(),
+            session_pcap::state_name(),
+            (unsigned)ESP.getFreePsram(),
+            (unsigned)ESP.getFreeHeap());
         return;
     }
     if (U == "VERSION") {

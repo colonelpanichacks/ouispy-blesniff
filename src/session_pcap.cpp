@@ -23,18 +23,18 @@ struct __attribute__((packed)) PcapRec {
     uint32_t incl_len, orig_len;
 };
 
+// Tiered PSRAM allocation. First entry that succeeds wins; nothing falls
+// through to DRAM (that path OOM-crashed the ESP32 previously).
+constexpr size_t CAP_TIERS[] = { 6 * 1024 * 1024, 4 * 1024 * 1024, 2 * 1024 * 1024 };
+
 uint8_t*             g_buf     = nullptr;
 size_t               g_cap     = 0;
 size_t               g_used    = 0;
 uint32_t             g_dropped = 0;
 SemaphoreHandle_t    g_lock    = nullptr;
 
-// Immutable snapshot for /api/session.pcap downloads. Live ring can shift
-// under us via memmove; snapshot preserves a coherent view for the whole
-// response. Overwritten on each snapshot_take() call.
-uint8_t*             g_snap      = nullptr;
-size_t               g_snap_cap  = 0;
-size_t               g_snap_size = 0;
+volatile State       g_state          = State::IDLE;
+volatile uint32_t    g_downloads      = 0;
 
 void write_global_header_locked() {
     PcapGlobal g{};
@@ -63,6 +63,11 @@ size_t next_boundary_after_locked(size_t bytes_to_drop) {
     return o;
 }
 
+void reset_ring_locked() {
+    write_global_header_locked();
+    g_dropped = 0;
+}
+
 } // namespace
 
 bool init() {
@@ -70,31 +75,80 @@ bool init() {
     g_lock = xSemaphoreCreateMutex();
     if (!g_lock) return false;
 
-    g_buf = (uint8_t*)heap_caps_malloc(DESIRED_CAP, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (g_buf) {
-        g_cap = DESIRED_CAP;
-    } else {
-        g_buf = (uint8_t*)malloc(FALLBACK_CAP);
-        if (!g_buf) { vSemaphoreDelete(g_lock); g_lock = nullptr; return false; }
-        g_cap = FALLBACK_CAP;
+    for (size_t i = 0; i < sizeof(CAP_TIERS) / sizeof(CAP_TIERS[0]); ++i) {
+        uint8_t* p = (uint8_t*)heap_caps_malloc(CAP_TIERS[i],
+                                                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (p) {
+            g_buf = p;
+            g_cap = CAP_TIERS[i];
+            Serial.printf("[session_pcap] tier %u ok: %u bytes in PSRAM\n",
+                          (unsigned)i, (unsigned)g_cap);
+            break;
+        }
+        Serial.printf("[session_pcap] tier %u FAILED (%u bytes)\n",
+                      (unsigned)i, (unsigned)CAP_TIERS[i]);
     }
+
+    if (!g_buf) {
+        Serial.println("[session_pcap] disabled -- no PSRAM tier available");
+        vSemaphoreDelete(g_lock);
+        g_lock = nullptr;
+        return false;
+    }
+
     xSemaphoreTake(g_lock, portMAX_DELAY);
-    write_global_header_locked();
-    g_dropped = 0;
+    reset_ring_locked();
+    g_state = State::IDLE;
     xSemaphoreGive(g_lock);
     return true;
 }
 
-void clear() {
-    if (!g_buf) return;
+State       state()      { return g_state; }
+const char* state_name() {
+    switch (g_state) {
+        case State::IDLE:      return "idle";
+        case State::RECORDING: return "recording";
+        case State::PAUSED:    return "paused";
+        case State::STOPPED:   return "stopped";
+    }
+    return "?";
+}
+
+bool cmd_record() {
+    if (!g_buf || !g_lock) return false;
+    // Legal from IDLE, PAUSED, STOPPED (i.e. anything but already RECORDING).
+    if (g_state == State::RECORDING) return false;
     xSemaphoreTake(g_lock, portMAX_DELAY);
-    write_global_header_locked();
-    g_dropped = 0;
+    reset_ring_locked();
+    g_state = State::RECORDING;
     xSemaphoreGive(g_lock);
+    return true;
+}
+
+bool cmd_pause() {
+    if (!g_buf || !g_lock) return false;
+    if (g_state != State::RECORDING) return false;
+    g_state = State::PAUSED;
+    return true;
+}
+
+bool cmd_resume() {
+    if (!g_buf || !g_lock) return false;
+    if (g_state != State::PAUSED) return false;
+    g_state = State::RECORDING;
+    return true;
+}
+
+bool cmd_stop() {
+    if (!g_buf || !g_lock) return false;
+    if (g_state != State::RECORDING && g_state != State::PAUSED) return false;
+    g_state = State::STOPPED;
+    return true;
 }
 
 void append(const scan::Frame& f) {
     if (!g_buf || !g_lock) return;
+    if (g_state != State::RECORDING) return;
 
     // Serialize into a local stage buffer, then move it under the lock.
     static uint8_t stage[nordic_pcap::FRAME_OVERHEAD + scan::MAX_PAYLOAD];
@@ -105,8 +159,14 @@ void append(const scan::Frame& f) {
 
     xSemaphoreTake(g_lock, portMAX_DELAY);
 
+    // Re-check state after taking the lock -- a stop() could have raced in.
+    if (g_state != State::RECORDING) {
+        xSemaphoreGive(g_lock);
+        return;
+    }
+
     if (g_used + rec_len > g_cap) {
-        // Reclaim roughly half the buffer — amortizes memmove cost.
+        // Reclaim roughly half the buffer -- amortizes memmove cost.
         const size_t want_free = g_cap / 2;
         const size_t drop_to = next_boundary_after_locked(want_free);
         if (drop_to > GLOBAL_HDR_LEN && drop_to <= g_used) {
@@ -137,9 +197,12 @@ uint32_t dropped()   { return g_dropped; }
 
 size_t read_chunk(size_t offset, uint8_t* out, size_t len) {
     if (!g_buf || !g_lock) return 0;
+    // Downloads are only served in STOPPED. If the state has moved on (Record
+    // wiped the ring) we return 0 and the chunked response terminates cleanly.
+    if (g_state != State::STOPPED) return 0;
     xSemaphoreTake(g_lock, portMAX_DELAY);
     size_t copied = 0;
-    if (offset < g_used) {
+    if (g_state == State::STOPPED && offset < g_used) {
         const size_t remain = g_used - offset;
         const size_t n = (len < remain) ? len : remain;
         memcpy(out, g_buf + offset, n);
@@ -149,35 +212,8 @@ size_t read_chunk(size_t offset, uint8_t* out, size_t len) {
     return copied;
 }
 
-size_t snapshot_take() {
-    if (!g_buf || !g_lock) return 0;
-    xSemaphoreTake(g_lock, portMAX_DELAY);
-    const size_t sz = g_used;
-    if (sz == 0) { xSemaphoreGive(g_lock); g_snap_size = 0; return 0; }
-    // Reuse existing snap allocation if it fits; otherwise realloc in PSRAM.
-    if (!g_snap || g_snap_cap < sz) {
-        if (g_snap) heap_caps_free(g_snap);
-        g_snap = (uint8_t*) heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!g_snap) {
-            g_snap = (uint8_t*) malloc(sz);  // DRAM fallback for tiny buffers
-        }
-        if (!g_snap) { g_snap_cap = 0; g_snap_size = 0; xSemaphoreGive(g_lock); return 0; }
-        g_snap_cap = sz;
-    }
-    memcpy(g_snap, g_buf, sz);
-    g_snap_size = sz;
-    xSemaphoreGive(g_lock);
-    return sz;
-}
-
-size_t snapshot_size() { return g_snap_size; }
-
-size_t snapshot_read(size_t offset, uint8_t* out, size_t len) {
-    if (!g_snap || offset >= g_snap_size) return 0;
-    const size_t remain = g_snap_size - offset;
-    const size_t n = (len < remain) ? len : remain;
-    memcpy(out, g_snap + offset, n);
-    return n;
-}
+void download_begin() { g_downloads++; }
+void download_end()   { if (g_downloads) g_downloads--; }
+uint32_t downloads_in_flight() { return g_downloads; }
 
 } // namespace session_pcap

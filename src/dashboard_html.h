@@ -370,6 +370,114 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<meta charset="utf-8">
   #save-status.ok { color: var(--good); }
   #save-status.err { color: var(--bad); }
 
+  /* -- session control strip ---------------------------------------- */
+  .sess {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    min-width: 0;
+  }
+  .sess .info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .sess .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase;
+    border: 1px solid;
+    background: rgba(255,255,255,0.02);
+    white-space: nowrap;
+  }
+  .sess .badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; background: currentColor;
+  }
+  .sess .badge.idle      { color: #8892a0; border-color: #4a5568; }
+  .sess .badge.recording {
+    color: #ff2b3b; border-color: #ff2b3b;
+    background: rgba(255,43,59,0.10);
+    animation: pulse-rec 1.2s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(255,43,59,0.35);
+  }
+  .sess .badge.paused    {
+    color: #f6c05a; border-color: #f6c05a;
+    background: rgba(246,192,90,0.10);
+  }
+  .sess .badge.stopped   {
+    color: #4ecca3; border-color: #4ecca3;
+    background: rgba(78,204,163,0.10);
+    box-shadow: 0 0 10px rgba(78,204,163,0.35);
+  }
+  @keyframes pulse-rec {
+    0%   { opacity: 0.6; }
+    50%  { opacity: 1.0; }
+    100% { opacity: 0.6; }
+  }
+
+  .sess .bar-wrap { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .sess .bar {
+    height: 10px; width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .sess .bar .fill {
+    height: 100%;
+    width: 0%;
+    background: #4a5568;
+    transition: width 200ms ease, background 120ms ease;
+    box-shadow: none;
+  }
+  .sess.state-recording .bar .fill { background: #ff2b3b; box-shadow: 0 0 10px rgba(255,43,59,0.55); }
+  .sess.state-paused    .bar .fill { background: #f6c05a; }
+  .sess.state-stopped   .bar .fill { background: #4ecca3; box-shadow: 0 0 10px rgba(78,204,163,0.45); }
+  .sess.state-idle      .bar .fill { background: #4a5568; }
+  .sess .readout {
+    display: flex; gap: 14px; align-items: center;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .sess .readout .fill-txt { color: var(--text); }
+  .sess .readout .drops    { color: var(--warn); }
+  .sess .readout .drops.zero { color: var(--muted); }
+  .sess .readout .mem      { color: var(--dim); }
+
+  .sess .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sess .sbtn {
+    padding: 7px 12px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px; font-weight: 600; letter-spacing: 1px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: color 100ms ease, border-color 100ms ease, background 100ms ease;
+  }
+  .sess .sbtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .sess .sbtn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+  }
+  .sess .sbtn.rec         { color: #ff2b3b; border-color: #ff2b3b; }
+  .sess .sbtn.rec:hover:not(:disabled)   { background: rgba(255,43,59,0.10); color: #ff2b3b; }
+  .sess .sbtn.pause       { color: #f6c05a; border-color: #f6c05a; }
+  .sess .sbtn.pause:hover:not(:disabled) { background: rgba(246,192,90,0.10); color: #f6c05a; }
+  .sess .sbtn.stop        { color: #d5dee8; border-color: #7d8896; }
+  .sess .sbtn.stop:hover:not(:disabled)  { background: rgba(213,222,232,0.06); color: #fff; border-color: #d5dee8; }
+  .sess .sbtn.save        { color: #4ecca3; border-color: #4ecca3; }
+  .sess .sbtn.save:hover:not(:disabled)  { background: rgba(78,204,163,0.10); color: #4ecca3; }
+
+  @media (max-width: 720px) {
+    .sess { grid-template-columns: 1fr; }
+    .sess .btns { justify-content: flex-start; }
+  }
+
   @media (max-width: 900px) {
     .app { grid-template-columns: 240px 1fr; }
     .banner { font-size: 6px; }
@@ -515,6 +623,25 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
   </aside>
 
   <div class="main">
+    <div class="sess state-idle" id="sess">
+      <div class="info">
+        <span class="badge idle" id="sessBadge"><span class="dot"></span><span id="sessBadgeTxt">IDLE</span></span>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar"><div class="fill" id="sessFill"></div></div>
+        <div class="readout">
+          <span class="fill-txt"><b id="sessBytesTxt">0 B</b> / <b id="sessCapTxt">--</b> &mdash; <b id="sessPct">0%</b></span>
+          <span class="drops zero">dropped: <b id="sessDrop">0</b></span>
+          <span class="mem">psram <b id="sessPsram">--</b> &middot; heap <b id="sessHeap">--</b></span>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="sbtn rec"   id="btnRecord" title="Start recording">&#9679; RECORD</button>
+        <button class="sbtn pause" id="btnPause"  title="Pause recording">&#9208; PAUSE</button>
+        <button class="sbtn stop"  id="btnStop"   title="Stop and finalize">&#9209; STOP</button>
+        <button class="sbtn save"  id="btnSavePcap" title="Download session PCAP">&#8681; SAVE PCAP</button>
+      </div>
+    </div>
     <div class="toolbar">
       <input type="text" id="filter" placeholder="filter -- rssi>-60 | addr:aa:bb | name:airtag | mfr:apple | free text" />
       <button class="btn settings" id="btnSettings">Settings</button>
@@ -522,8 +649,6 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
       <button class="btn active" id="pauseBtn">Running</button>
       <button class="btn" id="clearViewBtn">Clear</button>
       <button class="btn" id="snapBtn">CSV</button>
-      <button class="btn active" id="savePcapBtn">Save PCAP</button>
-      <button class="btn danger" id="clearSessionBtn">Clear session</button>
       <button class="btn danger" id="clearRingBtn">Clear ring</button>
     </div>
 
@@ -910,7 +1035,85 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
   $('clearRingBtn').onclick = async () => {
     try { await fetch('/api/clear', {method:'POST'}); } catch(e){}
   };
-  $('savePcapBtn').onclick = () => {
+
+  // --- Session state machine (Record / Pause / Stop / Save) -----------
+  // Server publishes the authoritative state on every WS status tick;
+  // button click optimistically flips UI, then the tick corrects any drift.
+  let sessState = 'idle';
+  let sessCap   = 0;
+  function pretty(state) {
+    if (state === 'recording') return 'RECORDING';
+    if (state === 'paused')    return 'PAUSED';
+    if (state === 'stopped')   return 'STOPPED';
+    return 'IDLE';
+  }
+  function applySessState(state) {
+    const s = state || 'idle';
+    sessState = s;
+    const sess = $('sess');
+    sess.classList.remove('state-idle','state-recording','state-paused','state-stopped');
+    sess.classList.add('state-' + s);
+    const badge = $('sessBadge');
+    badge.classList.remove('idle','recording','paused','stopped');
+    badge.classList.add(s);
+    $('sessBadgeTxt').textContent = pretty(s);
+
+    // Button enable/disable + label swap for RECORD <-> RESUME <-> RE-RECORD.
+    const rec   = $('btnRecord');
+    const pause = $('btnPause');
+    const stop  = $('btnStop');
+    const save  = $('btnSavePcap');
+    if (s === 'idle') {
+      rec.innerHTML   = '&#9679; RECORD';
+      rec.disabled    = false;
+      pause.disabled  = true;
+      stop.disabled   = true;
+      save.disabled   = true;
+    } else if (s === 'recording') {
+      rec.innerHTML   = '&#9679; RECORD';
+      rec.disabled    = true;
+      pause.disabled  = false;
+      stop.disabled   = false;
+      save.disabled   = true;
+    } else if (s === 'paused') {
+      rec.innerHTML   = '&#9654; RESUME';
+      rec.disabled    = false;
+      pause.disabled  = true;
+      stop.disabled   = false;
+      save.disabled   = true;
+    } else if (s === 'stopped') {
+      rec.innerHTML   = '&#9679; RE-RECORD';
+      rec.disabled    = false;
+      pause.disabled  = true;
+      stop.disabled   = true;
+      save.disabled   = false;
+    }
+  }
+  applySessState('idle');
+
+  async function sessPost(path) {
+    try {
+      const r = await fetch(path, {method:'POST'});
+      if (!r.ok) {
+        // Server truth wins on the next status tick; nothing to roll back visually.
+      }
+    } catch(e){}
+  }
+  $('btnRecord').onclick = () => {
+    // Optimistic: from idle/stopped/paused all land in recording.
+    applySessState('recording');
+    sessPost('/api/session/record');
+  };
+  $('btnPause').onclick = () => {
+    applySessState('paused');
+    sessPost('/api/session/pause');
+  };
+  $('btnStop').onclick = () => {
+    applySessState('stopped');
+    sessPost('/api/session/stop');
+  };
+  $('btnSavePcap').onclick = () => {
+    if (sessState !== 'stopped') return;
     const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
     const a = document.createElement('a');
     a.href = '/api/session.pcap?ts=' + Date.now();
@@ -918,10 +1121,6 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
     document.body.appendChild(a);
     a.click();
     a.remove();
-  };
-  $('clearSessionBtn').onclick = async () => {
-    if (!confirm('Discard the recorded session PCAP?')) return;
-    try { await fetch('/api/session/clear', {method:'POST'}); } catch(e){}
   };
   $('snapBtn').onclick = () => {
     const cols = ['idx','t_ms','ch','rssi','type','addr_type','address','name','svc','mfr','len'];
@@ -1102,6 +1301,21 @@ o888bood8P'  o888ooooood8 o888ooooood8 8""88888P'  o8o        `8  o888o o888o   
         $('totalPkts').textContent = msg.total || 0;
         $('sessBytes').textContent = fmtBytes(msg.session_bytes || 0);
         $('fwVer').textContent = msg.fw || '--';
+
+        // -- session strip: state, fill bar, drops, mem -----------------
+        applySessState(msg.state || 'idle');
+        sessCap = msg.session_cap || 0;
+        const sbytes = msg.session_bytes || 0;
+        $('sessBytesTxt').textContent = fmtBytes(sbytes);
+        $('sessCapTxt').textContent   = sessCap ? fmtBytes(sessCap) : '--';
+        const pct = sessCap ? Math.min(100, (sbytes * 100 / sessCap)) : 0;
+        $('sessPct').textContent = pct.toFixed(pct < 10 ? 1 : 0) + '%';
+        $('sessFill').style.width = pct.toFixed(2) + '%';
+        const sd = msg.session_drop || 0;
+        $('sessDrop').textContent = sd;
+        $('sessDrop').parentElement.classList.toggle('zero', sd === 0);
+        if (msg.psram_free != null) $('sessPsram').textContent = fmtBytes(msg.psram_free);
+        if (msg.heap_free  != null) $('sessHeap').textContent  = fmtBytes(msg.heap_free);
         return;
       }
       if (msg.type === 'pkts' && Array.isArray(msg.p)) {

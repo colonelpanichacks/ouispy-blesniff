@@ -57,7 +57,7 @@ size_t append_pkt_json(const scan::Frame& f, char* out, size_t cap) {
 
 void send_status() {
     if (ws.count() == 0) return;
-    StaticJsonDocument<384> doc;
+    StaticJsonDocument<512> doc;
     doc["type"] = "status";
     doc["uptime"] = (uint32_t)((millis() - boot_ms) / 1000);
     doc["pps"]    = scan::adverts_per_sec();
@@ -65,9 +65,14 @@ void send_status() {
     doc["dropped_pcap"] = scan::dropped_pcap();
     doc["dropped_dash"] = scan::dropped_dash();
     doc["session_bytes"] = (uint32_t)session_pcap::size();
+    doc["session_cap"]   = (uint32_t)session_pcap::capacity();
+    doc["session_drop"]  = (uint32_t)session_pcap::dropped();
+    doc["state"]         = session_pcap::state_name();
+    doc["psram_free"]    = (uint32_t)ESP.getFreePsram();
+    doc["heap_free"]     = (uint32_t)ESP.getFreeHeap();
     doc["fw"] = config::FW_VERSION();
 
-    char buf[400];
+    char buf[512];
     size_t n = serializeJson(doc, buf, sizeof(buf));
     ws.textAll(buf, n);
 }
@@ -214,21 +219,78 @@ void handle_clear(AsyncWebServerRequest* req) {
     req->send(200, "application/json", "{\"ok\":true}");
 }
 
-void handle_session_clear(AsyncWebServerRequest* req) {
-    session_pcap::clear();
-    req->send(200, "application/json", "{\"ok\":true}");
+// -- Session state machine endpoints -----------------------------------------
+// Legal transitions:
+//   IDLE|PAUSED|STOPPED -> RECORDING   (via /api/session/record; clears ring)
+//   RECORDING           -> PAUSED      (via /api/session/pause)
+//   PAUSED              -> RECORDING   (via /api/session/resume)
+//   RECORDING|PAUSED    -> STOPPED     (via /api/session/stop)
+// Illegal transitions return HTTP 409 with the current + attempted state.
+
+const char* target_name_for(const char* which) {
+    if (!strcmp(which, "record") || !strcmp(which, "resume")) return "recording";
+    if (!strcmp(which, "pause"))  return "paused";
+    if (!strcmp(which, "stop"))   return "stopped";
+    return "?";
+}
+
+void reply_transition(AsyncWebServerRequest* req, bool ok, const char* which, const char* from) {
+    if (ok) {
+        char body[80];
+        snprintf(body, sizeof(body), "{\"ok\":true,\"state\":\"%s\"}",
+                 session_pcap::state_name());
+        req->send(200, "application/json", body);
+    } else {
+        char body[160];
+        snprintf(body, sizeof(body),
+                 "{\"error\":\"invalid transition\",\"from\":\"%s\",\"to\":\"%s\"}",
+                 from, target_name_for(which));
+        req->send(409, "application/json", body);
+    }
+}
+
+void handle_session_record(AsyncWebServerRequest* req) {
+    const char* from = session_pcap::state_name();
+    reply_transition(req, session_pcap::cmd_record(), "record", from);
+}
+void handle_session_pause(AsyncWebServerRequest* req) {
+    const char* from = session_pcap::state_name();
+    reply_transition(req, session_pcap::cmd_pause(),  "pause",  from);
+}
+void handle_session_resume(AsyncWebServerRequest* req) {
+    const char* from = session_pcap::state_name();
+    reply_transition(req, session_pcap::cmd_resume(), "resume", from);
+}
+void handle_session_stop(AsyncWebServerRequest* req) {
+    const char* from = session_pcap::state_name();
+    reply_transition(req, session_pcap::cmd_stop(),   "stop",   from);
 }
 
 void handle_session_pcap(AsyncWebServerRequest* req) {
-    // Snapshot the live ring so the download can't desync when the writer
-    // memmoves the buffer mid-transfer.
-    const size_t total = session_pcap::snapshot_take();
-    if (total == 0) { req->send(204, "application/vnd.tcpdump.pcap", ""); return; }
+    // Download only permitted from STOPPED. The chunk reader takes the session
+    // mutex per 4KB copy and reads straight out of the live ring. There is no
+    // snapshot buffer -- the STOPPED guarantee is what makes it safe. If the
+    // state changes mid-download (Record wipes the ring) read_chunk() returns
+    // 0 and the chunked response truncates cleanly.
+    if (session_pcap::state() != session_pcap::State::STOPPED) {
+        req->send(409, "application/json",
+            "{\"error\":\"invalid transition\",\"detail\":\"download only allowed from stopped\"}");
+        return;
+    }
+    if (session_pcap::size() <= session_pcap::GLOBAL_HDR_LEN) {
+        req->send(204, "application/vnd.tcpdump.pcap", "");
+        return;
+    }
 
+    session_pcap::download_begin();
     AsyncWebServerResponse* r = req->beginChunkedResponse(
         "application/vnd.tcpdump.pcap",
         [](uint8_t* buf, size_t maxLen, size_t index) -> size_t {
-            return session_pcap::snapshot_read(index, buf, maxLen);
+            constexpr size_t CHUNK = 4096;
+            size_t want = maxLen < CHUNK ? maxLen : CHUNK;
+            size_t got = session_pcap::read_chunk(index, buf, want);
+            if (got == 0) session_pcap::download_end();
+            return got;
         });
     char filename[64];
     snprintf(filename, sizeof(filename), "attachment; filename=\"ouispy-blesniff-%lu.pcap\"",
@@ -259,7 +321,10 @@ bool init() {
     server.on("/api/reset", HTTP_POST, handle_reset);
     server.on("/api/clear", HTTP_POST, handle_clear);
     server.on("/api/session.pcap", HTTP_GET, handle_session_pcap);
-    server.on("/api/session/clear", HTTP_POST, handle_session_clear);
+    server.on("/api/session/record", HTTP_POST, handle_session_record);
+    server.on("/api/session/pause",  HTTP_POST, handle_session_pause);
+    server.on("/api/session/resume", HTTP_POST, handle_session_resume);
+    server.on("/api/session/stop",   HTTP_POST, handle_session_stop);
 
     server.onNotFound([](AsyncWebServerRequest* req){ req->send(404, "text/plain", "not found"); });
 
