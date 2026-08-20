@@ -13,10 +13,8 @@ Sister firmware to [ouispy-pcap](https://github.com/colonelpanichacks/ouispy-pca
 ## Feature checklist
 
 - NimBLE passive scan across 37/38/39, complete PDU capture with RSSI
-- **Two output modes on one USB-CDC**, runtime-toggle:
-  - **PCAP binary** (default) — Wireshark-ready stream using `LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR` (256) so channel + RSSI survive
-  - **Text summary** — human-readable one-liner per advert
-- **On-device dashboard** on `ouispy-blesniff` / `sniffuntothem` at `192.168.4.1` — live advert table, filter chips, session PCAP download
+- **USB-CDC text summary** — human-readable one-liner per advert (scriptable)
+- **On-device dashboard** on `ouispy-blesniff` / `sniffuntothem` at `192.168.4.1` — live advert table, filter chips, session PCAP download (Wireshark-ready `LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR` / 256)
 - **Chip filters**: advertising type (ADV_IND / ADV_NONCONN / ADV_SCAN / SCAN_REQ / SCAN_RSP / CONNECT_REQ / EXTENDED), traits (name-present / mfr-data / service-data), vendor identify against the OUI Database (RING, AXON, FLOCK SAFETY, DJI, PARROT, SKYDIO, META/RAY-BAN)
 - **Server-side 2 MB PSRAM session buffer** with browser download via `GET /api/session.pcap`
 - Configurable scan window / interval from the dashboard, filters persist to NVS
@@ -40,22 +38,9 @@ pio device monitor -b 115200
 
 ## Wireshark integration
 
-### Option A — extcap plugin (one-click)
+Join the `ouispy-blesniff` / `sniffuntothem` Wi-Fi, open `http://192.168.4.1`, and click **Save PCAP** on the toolbar. The download is `LINKTYPE_BLUETOOTH_LE_LL_WITH_PHDR` (256) so Wireshark keeps channel + RSSI.
 
-```bash
-mkdir -p ~/.config/wireshark/extcap
-cp tools/ouispy_blesniff_extcap.py ~/.config/wireshark/extcap/
-chmod +x ~/.config/wireshark/extcap/ouispy_blesniff_extcap.py
-```
-
-Open Wireshark → capture list → **OUI-SPY BLESNIFF** → pick serial port → start.
-
-### Option B — bare pipe
-
-```bash
-python3 tools/ouispy_blesniff_pipe.py /dev/tty.usbmodem* | wireshark -k -i -
-python3 tools/ouispy_blesniff_pipe.py /dev/tty.usbmodem* | tshark -i - -w capture.pcapng
-```
+The USB-CDC PCAP binary streaming path has been removed — ESP32-S3 Arduino USB CDC is not reliable for high-rate binary streaming, and the dashboard's PSRAM snapshot download parses cleanly regardless of capture rate. See `tools/README.md`.
 
 ---
 
@@ -65,8 +50,6 @@ Newline-terminated ASCII, prefix `CMD:`.
 
 | Command | Effect |
 |---|---|
-| `CMD:MODE PCAP` | Switch USB output to PCAP binary |
-| `CMD:MODE TEXT` | Switch USB output to text summaries |
 | `CMD:WINDOW <ms>` | Set BLE scan window (10-2000) |
 | `CMD:INTERVAL <ms>` | Set BLE scan interval (window ≤ interval, 20-4000) |
 | `CMD:STATUS` | Print device state as one JSON line |

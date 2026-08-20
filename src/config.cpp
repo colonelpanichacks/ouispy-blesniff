@@ -14,7 +14,6 @@ Preferences prefs;
 Config      cfg;
 
 void apply_defaults() {
-    cfg.out_mode         = OUT_PCAP;
     // Leave ~70% of the 2.4 GHz radio for WiFi coexistence so the AP stays
     // reachable while we scan. window==interval starves SoftAP beacons.
     cfg.scan_window_ms   = 30;
@@ -25,7 +24,6 @@ void apply_defaults() {
 }
 
 void clamp() {
-    if (cfg.out_mode > OUT_TEXT)               cfg.out_mode = OUT_PCAP;
     if (cfg.scan_window_ms < 10)               cfg.scan_window_ms = 10;
     if (cfg.scan_window_ms > 2000)             cfg.scan_window_ms = 2000;
     if (cfg.scan_interval_ms < 20)             cfg.scan_interval_ms = 20;
@@ -47,7 +45,6 @@ Config& get() { return cfg; }
 void load() {
     apply_defaults();
     prefs.begin(NS, true);
-    cfg.out_mode         = prefs.getUChar ("out",      cfg.out_mode);
     cfg.scan_window_ms   = prefs.getUShort("scan_win", cfg.scan_window_ms);
     cfg.scan_interval_ms = prefs.getUShort("scan_int", cfg.scan_interval_ms);
     cfg.ft_mask          = prefs.getUChar ("ftmask",   cfg.ft_mask);
@@ -60,7 +57,6 @@ void load() {
 void save() {
     clamp();
     prefs.begin(NS, false);
-    prefs.putUChar ("out",      cfg.out_mode);
     prefs.putUShort("scan_win", cfg.scan_window_ms);
     prefs.putUShort("scan_int", cfg.scan_interval_ms);
     prefs.putUChar ("ftmask",   cfg.ft_mask);
@@ -74,7 +70,6 @@ void reset_defaults() {
     save();
 }
 
-void set_out(uint8_t o)             { cfg.out_mode = (o > OUT_TEXT) ? OUT_PCAP : o; save(); }
 void set_scan_window(uint16_t ms)   { cfg.scan_window_ms = ms;   save(); }
 void set_scan_interval(uint16_t ms) { cfg.scan_interval_ms = ms; save(); }
 void set_ftmask(uint8_t m)          { cfg.ft_mask = m ? m : FT_DEFAULT; save(); }

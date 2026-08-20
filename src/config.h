@@ -4,9 +4,6 @@
 
 namespace config {
 
-constexpr uint8_t OUT_PCAP = 0;
-constexpr uint8_t OUT_TEXT = 1;
-
 // Filter mask bits — matched against per-advert traits at capture time.
 // Advert type bits use the wire-level LE LL PDU type numbering.
 constexpr uint8_t FT_ADV_IND       = 0x01;
@@ -24,8 +21,9 @@ constexpr uint8_t FT_DEFAULT =
     FT_ADV_IND | FT_ADV_DIRECT | FT_ADV_NONCONN | FT_SCAN_RSP | FT_ADV_SCAN_IND |
     FT_ADDR_PUBLIC | FT_ADDR_RANDOM;
 
+// USB output is text-only (line summaries + CMD replies). PCAP binary
+// capture lives on the dashboard exclusively -- GET /api/session.pcap.
 struct Config {
-    uint8_t  out_mode;
     uint16_t scan_window_ms;   // 10..scan_interval_ms
     uint16_t scan_interval_ms; // 20..4000
     uint8_t  ft_mask;
@@ -38,7 +36,6 @@ void        save();
 void        reset_defaults();
 Config&     get();
 
-void set_out(uint8_t o);
 void set_scan_window(uint16_t ms);
 void set_scan_interval(uint16_t ms);
 void set_ftmask(uint8_t m);

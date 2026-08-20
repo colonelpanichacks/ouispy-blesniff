@@ -3,18 +3,13 @@
 #include <Arduino.h>
 #include "scan.h"
 
+// USB output is text-only (one-line human-readable per advert). PCAP binary
+// capture lives on the dashboard exclusively -- GET /api/session.pcap in
+// web_dashboard.cpp / session_pcap.h. The dashboard path is bulletproof;
+// the USB CDC layer on ESP32-S3 could not be made reliable for high-rate
+// binary streaming (residual byte-boundary corruption under load).
 namespace pcap_stream {
 
-void begin();
-
-// Called when the output mode toggles between PCAP/TEXT at runtime.
-// Forces the pcap global header to be re-emitted on the next PCAP write.
-void on_mode_changed();
-
-// Emit the global pcap header once for the current output mode, if needed.
-void ensure_header_for_current_mode();
-
-void write_frame_pcap(const scan::Frame& f);
 void write_frame_text(const scan::Frame& f);
 
 } // namespace pcap_stream

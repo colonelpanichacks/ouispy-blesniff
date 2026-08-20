@@ -66,7 +66,6 @@ void send_status() {
     doc["dropped_dash"] = scan::dropped_dash();
     doc["session_bytes"] = (uint32_t)session_pcap::size();
     doc["fw"] = config::FW_VERSION();
-    doc["out"] = config::get().out_mode == config::OUT_PCAP ? "PCAP" : "TEXT";
 
     char buf[400];
     size_t n = serializeJson(doc, buf, sizeof(buf));
@@ -141,7 +140,6 @@ void dashboard_task(void*) {
 void handle_get_config(AsyncWebServerRequest* req) {
     StaticJsonDocument<512> doc;
     const auto& c = config::get();
-    doc["out"]      = c.out_mode;
     doc["scan_win"] = c.scan_window_ms;
     doc["scan_int"] = c.scan_interval_ms;
     doc["ftmask"]   = c.ft_mask;
@@ -169,12 +167,7 @@ void handle_post_config(AsyncWebServerRequest* req, uint8_t* data, size_t len, s
     if (err) { req->send(400, "application/json", "{\"error\":\"json\"}"); return; }
 
     bool need_apply_scan = false;
-    bool need_pcap_hdr   = false;
 
-    if (doc.containsKey("out")) {
-        uint8_t o = doc["out"];
-        if (o != config::get().out_mode) { config::set_out(o); need_pcap_hdr = true; }
-    }
     if (doc.containsKey("scan_win")) {
         uint16_t v = doc["scan_win"];
         if (v != config::get().scan_window_ms) { config::set_scan_window(v); need_apply_scan = true; }
@@ -189,7 +182,6 @@ void handle_post_config(AsyncWebServerRequest* req, uint8_t* data, size_t len, s
     }
 
     if (need_apply_scan) scan::apply_scan_params();
-    if (need_pcap_hdr)   pcap_stream::on_mode_changed();
 
     req->send(200, "application/json", "{\"ok\":true}");
 }

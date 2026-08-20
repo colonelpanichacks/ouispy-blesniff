@@ -92,17 +92,15 @@ void led_task(void*) {
 }
 
 void pcap_writer_task(void*) {
+    // USB output is text only. Full PCAP capture lives on the dashboard
+    // (GET /api/session.pcap). session_pcap::append fills the download
+    // buffer for every frame regardless of USB text emission.
     for (;;) {
         scan::Frame f;
         int drained = 0;
         while (drained < 16 && scan::pop_pcap(&f)) {
             last_advert_ms = millis();
-            if (config::get().out_mode == config::OUT_PCAP) {
-                pcap_stream::ensure_header_for_current_mode();
-                pcap_stream::write_frame_pcap(f);
-            } else {
-                pcap_stream::write_frame_text(f);
-            }
+            pcap_stream::write_frame_text(f);
             session_pcap::append(f);
             drained++;
         }
@@ -129,8 +127,8 @@ void print_banner() {
 
 String upper(const String& s) { String o = s; o.toUpperCase(); return o; }
 
-void reply_ok()               { if (config::get().out_mode == config::OUT_TEXT) Serial.println(F("OK")); }
-void reply_err(const char* m) { if (config::get().out_mode == config::OUT_TEXT) { Serial.print(F("ERR ")); Serial.println(m); } }
+void reply_ok()               { Serial.println(F("OK")); }
+void reply_err(const char* m) { Serial.print(F("ERR ")); Serial.println(m); }
 
 void handle_serial_cmd(const String& raw) {
     String line = raw; line.trim();
@@ -140,14 +138,12 @@ void handle_serial_cmd(const String& raw) {
     String U = upper(body);
 
     if (U == "STATUS") {
-        if (config::get().out_mode != config::OUT_TEXT) return;
         IPAddress ip = WiFi.softAPIP();
         String apmac = WiFi.softAPmacAddress();
-        Serial.printf("{\"out\":\"%s\",\"scan_win\":%u,\"scan_int\":%u,\"ftmask\":\"0x%02x\","
+        Serial.printf("{\"scan_win\":%u,\"scan_int\":%u,\"ftmask\":\"0x%02x\","
             "\"total\":%u,\"pps\":%u,\"drop_pcap\":%u,\"drop_dash\":%u,\"fw\":\"%s\","
             "\"ap_ssid\":\"%s\",\"ap_ip\":\"%s\",\"ap_mac\":\"%s\",\"ap_stations\":%u,"
             "\"session_bytes\":%u}\n",
-            config::get().out_mode == config::OUT_PCAP ? "PCAP" : "TEXT",
             (unsigned)config::get().scan_window_ms,
             (unsigned)config::get().scan_interval_ms,
             (unsigned)config::get().ft_mask,
@@ -162,15 +158,14 @@ void handle_serial_cmd(const String& raw) {
         return;
     }
     if (U == "VERSION") {
-        if (config::get().out_mode != config::OUT_TEXT) return;
         Serial.printf("OUI-SPY BLESNIFF %s built %s %s\n", config::FW_VERSION(), __DATE__, __TIME__);
         return;
     }
     if (U.startsWith("MODE ")) {
-        String v = U.substring(5); v.trim();
-        if (v == "PCAP") { config::set_out(config::OUT_PCAP); pcap_stream::on_mode_changed(); reply_ok(); return; }
-        if (v == "TEXT") { config::set_out(config::OUT_TEXT); pcap_stream::on_mode_changed(); reply_ok(); return; }
-        reply_err("bad mode"); return;
+        // Kept as a compatibility no-op. USB output is text only; PCAP
+        // binary capture lives on the dashboard at /api/session.pcap.
+        reply_ok();
+        return;
     }
     if (U.startsWith("WINDOW ")) {
         int v = U.substring(7).toInt();
@@ -256,7 +251,8 @@ void setup() {
         g_fault = Fault::Scan;
     }
 
-    pcap_stream::begin();
+    // pcap_stream no longer needs init -- USB output is text-only, session
+    // buffer for the dashboard is initialized separately.
 
     // pcap_writer_task copies scan::Frame (~280B) into a stack local per pop;
     // 8KB is comfortable headroom.
@@ -265,7 +261,7 @@ void setup() {
 
     if (g_fault == Fault::None) buzzer_chirp(1500, 40);
 
-    if (config::get().out_mode == config::OUT_TEXT) print_banner();
+    print_banner();
 }
 
 void loop() {
